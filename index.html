@@ -43,7 +43,8 @@ h1 span{color:var(--green);}
 .month-label{min-width:120px; text-align:center; font-weight:600;}
 
 .grid{display:grid; grid-template-columns:340px 1fr; gap:24px;}
-@media (max-width:760px){ .grid{grid-template-columns:1fr;} }
+.grid > div{min-width:0;}
+@media (max-width:760px){ .grid{grid-template-columns:minmax(0,1fr);} }
 
 .card{
   background:var(--paper2); border:1px solid var(--line); border-radius:10px; padding:20px;
@@ -59,6 +60,26 @@ input, select{
 }
 input:focus, select:focus{outline:2px solid var(--green); outline-offset:1px;}
 input[type=number]{font-family:"IBM Plex Mono",monospace;}
+input[type=date]{-webkit-appearance:none; appearance:none; display:block; min-width:0; max-width:100%; height:40px; text-align:left;}
+input[type=date]::-webkit-date-and-time-value{text-align:left;}
+
+.btn-sm{padding:8px 11px; border:1px solid var(--line); border-radius:6px; background:none; color:var(--ink); font-size:13px; cursor:pointer; font-family:Inter,sans-serif;}
+.btn-sm:hover{border-color:var(--green);}
+.card-head{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px;}
+.card .card-head h2{margin:0;}
+.preset{display:flex; gap:8px; align-items:stretch; margin-bottom:8px;}
+.preset .use{flex:1; min-width:0; text-align:left; padding:10px 12px; border:1px solid var(--line); border-radius:6px; background:var(--paper); color:var(--ink); font-size:14px; cursor:pointer; font-family:Inter,sans-serif;}
+.preset .use:hover{border-color:var(--green);}
+.preset .use b{display:block; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.preset .use small{color:var(--ink-soft); font-size:12px;}
+.preset .save{flex:1;}
+details.settings summary{cursor:pointer; font-family:"Source Serif 4",serif; font-size:16px; font-weight:700;}
+.row2{display:flex; gap:8px;}
+.row2 input{flex:1; min-width:0;}
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;}
+.chip{font-size:12px; padding:3px 4px 3px 10px; border-radius:100px; background:var(--paper); border:1px solid var(--line);}
+.chip button{border:none; background:none; color:var(--ink-soft); cursor:pointer; padding:0 4px;}
+.chip button:hover{color:var(--red);}
 
 .cat-hint{font-size:12px; color:var(--ink-soft); margin-top:6px; min-height:16px;}
 .cat-hint b{color:var(--ink);}
@@ -84,7 +105,7 @@ button.primary:hover{background:var(--green-dark);}
 
 .entries{list-style:none; margin:0; padding:0;}
 .entries li{
-  display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:12px;
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto auto auto; align-items:center; gap:10px;
   padding:10px 0; border-bottom:1px solid var(--line); font-size:14px;
 }
 .entries li:last-child{border-bottom:none;}
@@ -100,6 +121,7 @@ button.primary:hover{background:var(--green-dark);}
 .entries .del:hover{color:var(--red);}
 .empty{color:var(--ink-soft); font-size:14px; padding:20px 0; text-align:center;}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -123,19 +145,15 @@ button.primary:hover{background:var(--green-dark);}
         <label for="f-amount">Summa (€)</label>
         <input type="number" id="f-amount" step="0.01" min="0" placeholder="0.00">
         <label for="f-cat">Kategoria</label>
-        <select id="f-cat">
-          <option value="Asuminen">Asuminen</option>
-          <option value="Terveys">Terveys</option>
-          <option value="Liikenne">Liikenne</option>
-          <option value="Viihde">Viihde</option>
-          <option value="Edenred">Edenred</option>
-          <option value="Liikunta">Liikunta</option>
-          <option value="Vaatteet">Vaatteet</option>
-          <option value="Ruoka">Ruoka</option>
-          <option value="Muut">Muut</option>
-        </select>
+        <select id="f-cat"></select>
         <div class="cat-hint" id="catHint"></div>
         <button class="primary" id="addBtn">Lisää kirjaus</button>
+      </div>
+
+      <div class="card">
+        <h2>Vakio-ostokset</h2>
+        <div id="presets"></div>
+        <div class="cat-hint">Täytä lomake ja tallenna se vakioksi. Napautus lisää ostoksen tälle päivälle.</div>
       </div>
     </div>
 
@@ -154,15 +172,30 @@ button.primary:hover{background:var(--green-dark);}
         <div id="bars"></div>
       </div>
       <div class="card">
-        <h2>Kirjaukset</h2>
+        <div class="card-head"><h2>Kirjaukset</h2><button class="btn-sm" id="exportBtn">Lataa Excel</button></div>
+        <div class="cat-hint" id="exportMsg" style="min-height:0;margin:-6px 0 8px"></div>
         <ul class="entries" id="entryList"></ul>
       </div>
     </div>
   </div>
+      <details class="card settings" style="margin-top:24px">
+        <summary>Kategoriat ja avainsanat</summary>
+        <div style="margin-top:14px">
+          <label for="s-newcat">Uusi kategoria</label>
+          <div class="row2"><input type="text" id="s-newcat" placeholder="esim. Lemmikit"><button class="btn-sm" id="s-addcat">Lisää</button></div>
+          <label for="s-kwcat">Uusi avainsana kategoriaan</label>
+          <select id="s-kwcat"></select>
+          <div class="row2" style="margin-top:8px"><input type="text" id="s-kw" placeholder="esim. eläinlääkäri"><button class="btn-sm" id="s-addkw">Lisää</button></div>
+          <div class="cat-hint" id="setMsg">Avainsana osuu myös sanan osaan, esim. "vaate" tunnistaa "vaatteet".</div>
+          <div class="chips" id="customList"></div>
+        </div>
+      </details>
 </div>
 
 <script>
-const CATS = ["Asuminen","Terveys","Liikenne","Viihde","Edenred","Liikunta","Vaatteet","Ruoka","Muut"];
+const BASE_CATS = ["Asuminen","Terveys","Liikenne","Viihde","Edenred","Liikunta","Vaatteet","Ruoka"];
+let CATS = [...BASE_CATS, "Muut"];
+function colorOf(cat){ return CAT_COLOR[cat] || "var(--c-muut)"; }
 const CAT_COLOR = {
   Asuminen:"var(--c-asuminen)", Ruoka:"var(--c-ruoka)", Liikenne:"var(--c-liikenne)",
   Viihde:"var(--c-viihde)", Terveys:"var(--c-terveys)", Vaatteet:"var(--c-vaatteet)", Muut:"var(--c-muut)",
@@ -194,6 +227,9 @@ const KEYWORDS = [
 
 function guessCategory(desc){
   const d = desc.toLowerCase();
+  for (const cat of Object.keys(custom.kw)){
+    if ((custom.kw[cat] || []).some(w => d.includes(w))) return cat;
+  }
   for (const [cat, words] of KEYWORDS){
     if (words.some(w => d.includes(w))) return cat;
   }
@@ -267,10 +303,10 @@ function renderAll(){
     row.className = 'bar-row';
     row.innerHTML = `
       <div class="top">
-        <span><span class="dot" style="background:${CAT_COLOR[cat]}"></span>${cat}</span>
+        <span><span class="dot" style="background:${colorOf(cat)}"></span>${escapeHtml(cat)}</span>
         <span class="amt">${fmtEUR(amt)}</span>
       </div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${CAT_COLOR[cat]}"></div></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${colorOf(cat)}"></div></div>
     `;
     barsEl.appendChild(row);
   });
@@ -295,7 +331,7 @@ function renderAll(){
       li.innerHTML = `
         <span class="date">${dateStr}</span>
         <span class="desc">${escapeHtml(e.desc)}</span>
-        <span class="cat-pill" style="background:${CAT_COLOR[e.category]}">${e.category}</span>
+        <span class="cat-pill" style="background:${colorOf(e.category)}">${escapeHtml(e.category)}</span>
         <span class="amt">${fmtEUR(e.amount)}${note}</span>
         <button class="del" data-id="${e.id}" aria-label="Poista">✕</button>
       `;
@@ -323,7 +359,7 @@ document.getElementById('addBtn').addEventListener('click', ()=>{
   const amtEl = document.getElementById('f-amount');
   const catEl = document.getElementById('f-cat');
 
-  const date = dateEl.value || new Date().toISOString().slice(0,10);
+  const date = dateEl.value || todayISO();
   const desc = descEl.value.trim();
   const amount = parseFloat(amtEl.value);
 
@@ -333,18 +369,20 @@ document.getElementById('addBtn').addEventListener('click', ()=>{
     return;
   }
 
-  entries.push({
-    id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
-    date, desc, amount, category: catEl.value
-  });
-  save();
-
-  const entryMonth = date.slice(0,7);
-  viewDate = new Date(entryMonth + '-01T00:00:00');
+  addEntry({date, desc, amount, category: catEl.value});
   descEl.value=''; amtEl.value=''; document.getElementById('catHint').textContent='';
   descEl.focus();
-  renderAll();
 });
+
+function addEntry({date, desc, amount, category}){
+  entries.push({
+    id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
+    date, desc, amount, category
+  });
+  save();
+  viewDate = new Date(date.slice(0,7) + '-01T00:00:00');
+  renderAll();
+}
 
 document.getElementById('entryList').addEventListener('click', (e)=>{
   if (e.target.classList.contains('del')){
@@ -362,9 +400,169 @@ document.getElementById('nextM').addEventListener('click', ()=>{
   viewDate.setMonth(viewDate.getMonth()+1); renderAll();
 });
 
-// Init
-document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+// ---------- Apufunktiot ----------
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function lsGet(k, fallback){
+  try{ const r = localStorage.getItem(k); return r ? JSON.parse(r) : fallback; }catch(e){ return fallback; }
+}
+function lsSet(k, v){
+  try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ console.error('Tallennus epäonnistui', e); }
+}
+function flag(el){ el.style.borderColor='var(--red)'; setTimeout(()=>{ el.style.borderColor=''; }, 1200); }
+
+// ---------- Omat kategoriat ja avainsanat ----------
+const PALETTE = ["#5B6FB5","#B5567A","#4F8F8F","#9A6B3A","#7A5BA8","#5E8C3A"];
+let custom = lsGet('kulukirja:custom', {cats:[], kw:{}});
+custom.cats = custom.cats || []; custom.kw = custom.kw || {};
+
+function fillSelect(sel){
+  const cur = sel.value;
+  sel.innerHTML = '';
+  CATS.forEach(c => sel.add(new Option(c, c)));
+  if (CATS.includes(cur)) sel.value = cur;
+}
+function refreshCats(){
+  CATS = [...BASE_CATS, ...custom.cats.map(c=>c.name), "Muut"];
+  custom.cats.forEach(c => { CAT_COLOR[c.name] = c.color; });
+  fillSelect(document.getElementById('f-cat'));
+  fillSelect(document.getElementById('s-kwcat'));
+}
+function setMsg(t){ document.getElementById('setMsg').textContent = t; }
+
+function renderCustom(){
+  const el = document.getElementById('customList');
+  el.innerHTML = '';
+  const chip = (label, onDel) => {
+    const s = document.createElement('span'); s.className = 'chip';
+    s.appendChild(document.createTextNode(label + ' '));
+    const b = document.createElement('button'); b.textContent = '✕'; b.setAttribute('aria-label','Poista');
+    b.onclick = onDel; s.appendChild(b); el.appendChild(s);
+  };
+  custom.cats.forEach(c => chip('Kategoria: ' + c.name, () => delCat(c.name)));
+  Object.keys(custom.kw).forEach(cat => custom.kw[cat].forEach(w => chip(cat + ': ' + w, () => delKw(cat, w))));
+  if (!el.children.length) el.innerHTML = '<span class="cat-hint">Ei omia lisäyksiä vielä.</span>';
+}
+function delCat(name){
+  if (entries.some(e => e.category === name)) return setMsg('Kategoriaa "'+name+'" käytetään kirjauksissa, joten sitä ei voi poistaa.');
+  custom.cats = custom.cats.filter(c => c.name !== name);
+  delete custom.kw[name];
+  presets = presets.map(p => (p && p.category === name) ? null : p);
+  lsSet('kulukirja:presets', presets);
+  lsSet('kulukirja:custom', custom);
+  refreshCats(); renderCustom(); renderPresets(); renderAll();
+}
+function delKw(cat, w){
+  custom.kw[cat] = (custom.kw[cat] || []).filter(x => x !== w);
+  if (!custom.kw[cat].length) delete custom.kw[cat];
+  lsSet('kulukirja:custom', custom); renderCustom();
+}
+
+document.getElementById('s-addcat').addEventListener('click', ()=>{
+  const inp = document.getElementById('s-newcat');
+  const name = inp.value.trim();
+  if (!name) return setMsg('Kirjoita kategorian nimi.');
+  if (name.length > 24) return setMsg('Nimi on liian pitkä (enintään 24 merkkiä).');
+  if (CATS.some(c => c.toLowerCase() === name.toLowerCase())) return setMsg('Kategoria on jo olemassa.');
+  custom.cats.push({name, color: PALETTE[custom.cats.length % PALETTE.length]});
+  lsSet('kulukirja:custom', custom);
+  inp.value = '';
+  refreshCats(); renderCustom(); renderAll();
+  document.getElementById('s-kwcat').value = name;
+  setMsg('Kategoria "' + name + '" lisätty. Voit nyt lisätä sille avainsanoja.');
+});
+document.getElementById('s-addkw').addEventListener('click', ()=>{
+  const cat = document.getElementById('s-kwcat').value;
+  const inp = document.getElementById('s-kw');
+  const w = inp.value.trim().toLowerCase();
+  if (!w) return setMsg('Kirjoita avainsana.');
+  if (cat === 'Muut') return setMsg('Muut on oletuskategoria, valitse jokin toinen.');
+  const list = custom.kw[cat] || (custom.kw[cat] = []);
+  if (list.includes(w)) return setMsg('Avainsana on jo lisätty.');
+  list.push(w);
+  lsSet('kulukirja:custom', custom);
+  inp.value = '';
+  renderCustom(); setMsg('Avainsana "' + w + '" lisätty kategoriaan ' + cat + '.');
+});
+
+// ---------- Vakio-ostokset ----------
+let presets = lsGet('kulukirja:presets', [null, null]);
+if (!Array.isArray(presets) || presets.length !== 2) presets = [null, null];
+
+function renderPresets(){
+  const el = document.getElementById('presets');
+  el.innerHTML = '';
+  presets.forEach((p, i) => {
+    const row = document.createElement('div'); row.className = 'preset';
+    if (p){
+      const use = document.createElement('button'); use.className = 'use';
+      use.innerHTML = `<b>+ ${escapeHtml(p.desc)}</b><small>${fmtEUR(p.amount)} · ${escapeHtml(p.category)} · tälle päivälle</small>`;
+      use.onclick = () => addEntry({date: todayISO(), desc: p.desc, amount: p.amount, category: CATS.includes(p.category) ? p.category : 'Muut'});
+      const clr = document.createElement('button'); clr.className = 'btn-sm'; clr.textContent = '✕';
+      clr.setAttribute('aria-label','Tyhjennä vakio-ostos');
+      clr.onclick = () => { presets[i] = null; lsSet('kulukirja:presets', presets); renderPresets(); };
+      row.append(use, clr);
+    } else {
+      const sv = document.createElement('button'); sv.className = 'btn-sm save';
+      sv.textContent = 'Tallenna lomakkeesta vakioksi ' + (i+1);
+      sv.onclick = () => {
+        const desc = document.getElementById('f-desc').value.trim();
+        const amountEl = document.getElementById('f-amount');
+        const amount = parseFloat(amountEl.value);
+        if (!desc || isNaN(amount) || amount <= 0){ flag(amountEl); return; }
+        presets[i] = {desc, amount, category: document.getElementById('f-cat').value};
+        lsSet('kulukirja:presets', presets); renderPresets();
+      };
+      row.appendChild(sv);
+    }
+    el.appendChild(row);
+  });
+}
+
+// ---------- Excel-vienti ----------
+const r2 = n => Math.round(n * 100) / 100;
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const msg = document.getElementById('exportMsg');
+  if (!entries.length){ msg.textContent = 'Ei kirjauksia vietäväksi.'; setTimeout(()=>{ msg.textContent=''; }, 2500); return; }
+  const sorted = [...entries].sort((a,b) => a.date.localeCompare(b.date));
+  const rows = [["Päivämäärä","Kuvaus","Kategoria","Summa (€)","Laskettu summa (€)"]];
+  sorted.forEach(e => rows.push([e.date, e.desc, e.category, r2(e.amount), r2(effectiveAmount(e))]));
+
+  const months = [...new Set(sorted.map(e => e.date.slice(0,7)))];
+  const cats = CATS.filter(c => sorted.some(e => e.category === c));
+  const sum = [["Kuukausi", ...cats, "Yhteensä"]];
+  months.forEach(m => {
+    const es = sorted.filter(e => e.date.startsWith(m));
+    const vals = cats.map(c => r2(es.filter(e => e.category === c).reduce((s,e) => s + effectiveAmount(e), 0)));
+    sum.push([m, ...vals, r2(vals.reduce((a,b) => a + b, 0))]);
+  });
+
+  const fname = 'kulukirja-' + todayISO();
+  if (typeof XLSX !== 'undefined'){
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.aoa_to_sheet(rows);
+    ws1['!cols'] = [{wch:12},{wch:32},{wch:14},{wch:12},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Kirjaukset');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), 'Yhteenveto');
+    XLSX.writeFile(wb, fname + '.xlsx');
+  } else {
+    // Varakeino: CSV, jonka Excel avaa (puolipiste erottimena)
+    const cell = v => typeof v === 'number' ? String(v).replace('.', ',') : '"' + String(v).replace(/"/g,'""') + '"';
+    const csv = '\ufeff' + rows.map(r => r.map(cell).join(';')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    a.download = fname + '.csv'; a.click();
+  }
+});
+
+// ---------- Alustus ----------
+document.getElementById('f-date').value = todayISO();
 load();
+refreshCats();
+renderPresets();
+renderCustom();
 renderAll();
 </script>
 </body>
