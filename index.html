@@ -13,6 +13,7 @@
   --c-asuminen:#2F6B4F; --c-ruoka:#B8912B; --c-liikenne:#3E6E8E;
   --c-viihde:#8A4B6E; --c-terveys:#A8452F; --c-vaatteet:#6B6E3E; --c-muut:#7C7C74;
   --c-edenred:#D9822B; --c-liikunta:#1F9E89;
+  --c-lainakulut:#3B4F8A; --c-ravintola:#D1495B;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
@@ -231,13 +232,14 @@ button.primary:hover{background:var(--green-dark);}
 <div class="toast" id="toast"></div>
 
 <script>
-const BASE_CATS = ["Asuminen","Terveys","Liikenne","Viihde","Edenred","Liikunta","Vaatteet","Ruoka"];
+const BASE_CATS = ["Asuminen","Lainakulut","Terveys","Liikenne","Viihde","Edenred","Liikunta","Vaatteet","Ruoka","Ravintola"];
 let CATS = [...BASE_CATS, "Muut"];
 function colorOf(cat){ return CAT_COLOR[cat] || "var(--c-muut)"; }
 const CAT_COLOR = {
   Asuminen:"var(--c-asuminen)", Ruoka:"var(--c-ruoka)", Liikenne:"var(--c-liikenne)",
   Viihde:"var(--c-viihde)", Terveys:"var(--c-terveys)", Vaatteet:"var(--c-vaatteet)", Muut:"var(--c-muut)",
-  Edenred:"var(--c-edenred)", Liikunta:"var(--c-liikunta)"
+  Edenred:"var(--c-edenred)", Liikunta:"var(--c-liikunta)",
+  Lainakulut:"var(--c-lainakulut)", Ravintola:"var(--c-ravintola)"
 };
 // Kategorioiden erikoissäännöt kulun laskentaan
 // Edenred: ensimmäisestä 14 eurosta lasketaan mukaan vain 75%, 14 euron ylittävä osa lasketaan täysimääräisenä
@@ -258,11 +260,13 @@ function effectiveAmount(e){
 // Avainsanat -> kategoria (tarkistetaan järjestyksessä, ensimmäinen osuma voittaa).
 // Ruoka tarkistetaan ennen Liikennettä, jotta esim. "Uber Eats" osuu Ruokaan eikä Liikenteen "uber"-sanaan.
 const KEYWORDS = [
-  ["Asuminen", ["vuokra","vastike","sähkö","sahko","vesimaksu","korko","internet","netti","kaukolämpö","kaukolampo","asuntolaina","yhtiövastike","yhtiovastike","lämmitys","lammitys","laina","lyhennys"]],
+  ["Asuminen", ["vuokra","vastike","sähkö","sahko","vesimaksu","internet","netti","kaukolämpö","kaukolampo","yhtiövastike","yhtiovastike","lämmitys","lammitys","lyhennys"]],
+  ["Lainakulut", ["asuntolaina","korko","laina","opintolaina"]],
   ["Terveys", ["apteekki","lääkäri","laakari","hammas","fysioterapia","terveys","optikko","lääke","yths"]],
-  ["Ruoka", ["ruoka","kauppa","market","prisma","lidl","alepa","sale","citymarket","ravintola","kahvila","pizza","wolt","foodora","uber eats"]],
+  ["Ravintola", ["kalja","olut","bisse","safka","ravintola"]],
+  ["Ruoka", ["ruoka","kauppa","market","prisma","lidl","alepa","sale","citymarket","kahvila","pizza","wolt","foodora","uber eats"]],
   ["Liikenne", ["bensa","polttoaine","hsl","juna","bussi","taksi","parkki","pysäköinti","pysakointi","autovakuutus","katsastus","abc","vr","bolt","uber"]],
-  ["Viihde", ["netflix","spotify","hbo","elokuva","konsertti","peli","steam","disney+","viihde","teatteri","kalja","olut"]],
+  ["Viihde", ["netflix","spotify","hbo","elokuva","konsertti","peli","steam","disney+","viihde","teatteri"]],
   ["Edenred", ["edenred"]],
   ["Liikunta", ["kuntosali","sali","liikunta"]],
   ["Vaatteet", ["h&m","zara","vaatteet","kengät","kengat","asusteet","vaateliike","vaate","zalando","suit"]],
