@@ -341,7 +341,11 @@ function renderAll(){
   if (isCurrentMonth && total > 0){
     const daysElapsed = today.getDate();
     const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
-    const projected = (total / daysElapsed) * daysInMonth;
+    // Toistuvat kulut (esim. vuokra) ovat jo tiedossa koko kuulle, joten niitä ei ennusteta
+    // päiväkeskiarvon kautta - vain kertaluontoiset/vaihtelevat kulut skaalataan jäljellä oleville päiville.
+    const recurringTotal = monthEntries.filter(e => e.recurringId).reduce((s,e) => s + effectiveAmount(e), 0);
+    const variableTotal = total - recurringTotal;
+    const projected = recurringTotal + (variableTotal / daysElapsed) * daysInMonth;
     document.getElementById('forecastAmt').textContent = fmtEUR(projected);
     document.getElementById('forecastLbl').textContent = `Ennuste koko kuulle (pv ${daysElapsed}/${daysInMonth})`;
     forecastBox.style.display = '';
