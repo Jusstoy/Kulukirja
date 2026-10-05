@@ -115,22 +115,29 @@ button.primary:hover{background:var(--green-dark);}
 .bar-fill{height:100%; border-radius:4px;}
 .dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px;}
 
-.entries{list-style:none; margin:0; padding:0;}
-.entries li{
-  display:grid; grid-template-columns:auto minmax(0,1fr) auto auto auto; align-items:center; gap:10px;
-  padding:10px 0; border-bottom:1px solid var(--line); font-size:14px;
-}
-.entries li:last-child{border-bottom:none;}
-.entries .date{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink-soft); white-space:nowrap;}
-.entries .desc{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.entries{width:100%; border-collapse:collapse; table-layout:fixed; font-size:14px;}
+.entries td{padding:9px 4px; border-bottom:1px solid var(--line); vertical-align:middle; overflow:hidden;}
+.entries tr:last-child td{border-bottom:none;}
+.entries td:first-child{padding-left:0;}
+.entries td:last-child{padding-right:0;}
+.entries .col-date{width:44px; font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink-soft); white-space:nowrap;}
+.entries .col-desc{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.entries .col-cat{width:92px;}
 .entries .cat-pill{
-  font-size:11.5px; padding:3px 9px; border-radius:100px; white-space:nowrap; color:#fff;
+  display:inline-block; max-width:100%; font-size:11.5px; padding:3px 9px; border-radius:100px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#fff; box-sizing:border-box;
 }
-.entries .amt{font-family:"IBM Plex Mono",monospace; font-weight:600; white-space:nowrap;}
+.entries .col-amt{width:84px; font-family:"IBM Plex Mono",monospace; font-weight:600; text-align:right; white-space:nowrap;}
+.entries .col-amt .note{display:block; font-weight:400; color:var(--ink-soft); font-size:11px; margin-top:2px;}
+.entries .col-del{width:26px; text-align:right;}
 .entries .del{
-  background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:16px; padding:2px 6px;
+  background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:16px; padding:2px 0 2px 6px;
 }
 .entries .del:hover{color:var(--red);}
+.entries .section-label td{
+  padding-top:18px; padding-bottom:7px; border-bottom:none; font-size:12px; font-weight:600;
+  color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;
+}
 .empty{color:var(--ink-soft); font-size:14px; padding:20px 0; text-align:center;}
 
 .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; z-index:50; overflow-y:auto;}
@@ -217,7 +224,7 @@ button.primary:hover{background:var(--green-dark);}
         </div>
         <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none">
         <div class="cat-hint" id="exportMsg" style="min-height:0;margin:-6px 0 8px"></div>
-        <ul class="entries" id="entryList"></ul>
+        <table class="entries"><tbody id="entryList"></tbody></table>
       </div>
     </div>
   </div>
@@ -381,25 +388,33 @@ function renderAll(){
   const listEl = document.getElementById('entryList');
   listEl.innerHTML = '';
   if (monthEntries.length === 0){
-    listEl.innerHTML = '<li class="empty" style="display:block">Lisää ensimmäinen kirjaus vasemmalta.</li>';
+    listEl.innerHTML = '<tr><td colspan="5" class="empty">Lisää ensimmäinen kirjaus vasemmalta.</td></tr>';
   } else {
-    monthEntries.forEach(e=>{
-      const li = document.createElement('li');
+    const row = (e) => {
+      const tr = document.createElement('tr');
       const d = new Date(e.date);
       const dateStr = d.toLocaleDateString('fi-FI', {day:'2-digit', month:'2-digit'});
       const eff = effectiveAmount(e);
-      const note = eff !== e.amount
-        ? `<br><small style="font-weight:400;color:var(--ink-soft);font-size:11px">→ ${fmtEUR(eff)} laskettuna</small>`
-        : '';
-      li.innerHTML = `
-        <span class="date">${dateStr}</span>
-        <span class="desc">${escapeHtml(e.desc)}${e.shared ? ' <small style="color:var(--ink-soft);font-weight:400">(yhteinen)</small>' : ''}</span>
-        <span class="cat-pill" style="background:${colorOf(e.category)}">${escapeHtml(e.category)}</span>
-        <span class="amt">${fmtEUR(e.amount)}${note}</span>
-        <button class="del" data-id="${e.id}" aria-label="Poista">✕</button>
+      const note = eff !== e.amount ? `<span class="note">→ ${fmtEUR(eff)}</span>` : '';
+      tr.innerHTML = `
+        <td class="col-date">${dateStr}</td>
+        <td class="col-desc">${escapeHtml(e.desc)}${e.shared ? ' <small style="color:var(--ink-soft);font-weight:400">(yhteinen)</small>' : ''}</td>
+        <td class="col-cat"><span class="cat-pill" style="background:${colorOf(e.category)}">${escapeHtml(e.category)}</span></td>
+        <td class="col-amt">${fmtEUR(e.amount)}${note}</td>
+        <td class="col-del"><button class="del" data-id="${e.id}" aria-label="Poista">✕</button></td>
       `;
-      listEl.appendChild(li);
-    });
+      return tr;
+    };
+    const normal = monthEntries.filter(e => !e.recurringId);
+    const recurringRows = monthEntries.filter(e => e.recurringId);
+    normal.forEach(e => listEl.appendChild(row(e)));
+    if (recurringRows.length){
+      const label = document.createElement('tr');
+      label.className = 'section-label';
+      label.innerHTML = '<td colspan="5">Kuukausikulut</td>';
+      listEl.appendChild(label);
+      recurringRows.forEach(e => listEl.appendChild(row(e)));
+    }
   }
 }
 
